@@ -6,18 +6,36 @@ def minority_class(labels):
     if len(labels) == 0:
         return 0
     frequencies = labels.value_counts().values  # array, sorted in descending order
-    probabilities = [f / len(labels) for f in frequencies[1:]]   # everything except the first class
+    probabilities = [f / len(labels) for f in frequencies[1:]]  # everything except the first class
     impurity = sum(probabilities)
     return impurity
 
 
 def gini(labels):
-    raise NotImplementedError('Your code here')
+    # Count the number of occurrences of each label
+    frequencies = labels.value_counts().values
+
+    # Calculate the proportion in each class
+    proportions = frequencies / len(labels)
+
+    # Compute the impurity using the formula
+    impurity = 1 - sum(proportions ** 2)  # Sum up all the individual Gini contributions from each label value
+
     return impurity
 
 
 def entropy(labels):
-    raise NotImplementedError('Your code here')
+    # Count the number of occurrences of each label
+    count = labels.value_counts()
+
+    # Calculate the proportion in each class
+    proportions = count / len(labels)
+
+    # Calculate the entropy
+    entropy = -(proportions * (proportions.apply(np.log2)))
+
+    impurity = entropy.sum()  # Sum up all the individual Entropy contributions from each label value
+
     return impurity
 
 
@@ -50,7 +68,33 @@ class DTree:
 
         We select the feature with the lowest weighted impurity.
         """
-        raise NotImplementedError('Your code here')
+
+        # Base values
+        best_so_far = None
+        best_so_far_impurity = np.inf
+
+        # Loop over each feature in the df
+        for i in features:
+            feature_values = features[i]  # Get the values of each feature
+
+            # Loop over each unique value of the feature
+            for value in feature_values:
+
+                # Divide the labels into two branches based on whether they have the current feature value
+                yes_branch = labels[feature_values == value]
+                no_branch = labels[feature_values != value]
+
+                # Calculate the weight of both branches
+                yes_weight = len(yes_branch) / len(labels)
+                no_weight = len(no_branch) / len(labels)
+
+                # Calculate the impurity of both the yes_branch and the no_brand and add them together
+                impurity = yes_weight * self._metric(yes_branch) + no_weight * self._metric(no_branch)
+
+                # Impurity always needs to be as low as possible
+                if impurity < best_so_far_impurity:
+                    best_so_far = i  # Change to the new best feature
+                    best_so_far_impurity = impurity  # Change to the new best impurity
         return best_so_far, best_so_far_impurity
 
     def fit(self, features, labels):
@@ -71,11 +115,41 @@ class DTree:
         and fit the Yes subtree with the instances that split to the True side,
         and the No subtree with the instances that are False according to the splitting feature.
         """
-        raise NotImplementedError('Your code here')
 
         split, split_impurity = self._best_split(features, labels)  # Find the best split, if any
 
-        raise NotImplementedError('... and the rest of your code here')
+        # These values are the same in both cases: when you want to split and when you don't want to split
+        self._samples = len(labels)
+        self._distribution = labels.value_counts()  # Count the amount of times a certain feature is or is not present
+        self._impurity = self._metric(labels)
+
+        # Count the label with the highest frequency
+        highest_frequency = 0
+        for i, j in self._distribution.items():
+            if j > highest_frequency:
+                self._label = i
+                highest_frequency = j
+
+        # If the impurity of the split is bigger than current impurity, we don't want to make that split
+        if split_impurity >= self._metric(labels):
+            return  # Exit the function and return nothing
+
+        # We want to split
+        self._split = split  # Now contains the name of the best feature to split on
+
+        # Initialize the self._yes and self._no variables as new DTrees with the same metric.
+        self._yes = DTree(self._metric)
+        self._no = DTree(self._metric)
+
+        # Split the training instance features & labels according to the best splitting feature found
+        yes_branch = features[self._split] == 1  # Select instances that have value True for the best splitting feature found
+        no_branch = features[self._split] == 0  # Select instances that have value False for the best splitting feature found
+
+        # Start fitting the yes_branch subtree
+        self._yes.fit(features[yes_branch], labels[yes_branch])
+
+        # Start fitting the no_branch subtree
+        self._no.fit(features[no_branch], labels[no_branch])
 
     def predict(self, features):
         """ Predict the labels of the instances based on the features
